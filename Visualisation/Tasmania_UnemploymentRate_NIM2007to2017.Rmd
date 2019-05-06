@@ -1,0 +1,136 @@
+---
+title: "MATH2270/MATH2237 Assignment 2"
+subtitle: Visualising Open Data
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+## Student Details
+
+*  Loan Huynh (s3655461)
+
+## Data Source
+
+- Australian Bureau of Statistics. *Net overseas migration, Arrivals, departures and net, State/territory, Major groupings and visas *. Available from http://www.abs.gov.au/ausstats/abs@.nsf/mf/3412.0
+
+-  Australian Bureau of Statistics. *6202.0 - Labour Force, Australia, Mar 2019 *. Available from http://www.abs.gov.au/ausstats/abs@.nsf/mf/6202.0
+
+## Video Presentation URL
+
+https://drive.google.com/file/d/1QAAqQcelmyZ2ILPRVfNU1lMMU1U5LuRp/view?usp=sharing 
+or
+https://drive.google.com/file/d/10LPU1p6gr58z7djiI5Ko4_FiTvZVf_vs/view?usp=sharing
+
+## Code
+
+```{r warning=FALSE, error=FALSE, message=FALSE}
+
+library(ggplot2)  # Simple, verstile plots
+library(tidyr)    # Restructuring original datasets (from wide to long format)
+library(dplyr)    # Data manipulation (factor levels, labels etc.)
+library(lubridate) # Datetime manipulation
+library(cowplot)  # Grids for output layout
+library(RColorBrewer)  # Colour-blind friendly palettes
+library(readxl)
+
+## Data
+tas_migrants <- read_xlsx("data/Tas_migration.xlsx")
+tas_unemploy <- read_xlsx("data/Tas_unemploymentRate.xlsx")
+
+# Convert tas_migrants from wide to long
+tas_migrants_con <- gather(tas_migrants, key = "Year", value = "Values", 2:12)
+
+# Calculate average umployment rate within a year
+years <- year(as.Date(tas_unemploy$Date, "%Y-%m-%d"))
+tas_unemploy_anual <- tas_unemploy %>% group_by(year(as.Date(Date, "%Y-%m-%d"))) %>% summarise(AnnualUnemploymentRate = round(mean(`Unemployment Rate`),2))
+# Change column name in tas_unemploy_anual
+names(tas_unemploy_anual)[1] <- "Year"
+tas_unemploy_anual$Year <- as.factor(tas_unemploy_anual$Year)
+# Visualization
+
+
+# Create stacked bar chart for Migrations
+p1 <- ggplot(tas_migrants_con)+
+  geom_bar(aes(x = Year, y = Values, fill = Migration), stat = "identity", width = 0.5) + 
+ # scale_fill_manual(values = c("deepskyblue4")) +
+  geom_hline(yintercept = 0, color = "dodgerblue4") +
+  theme(panel.background = element_rect(fill = "white", color = "grey50"),
+        panel.grid.minor.y = element_line(colour = "grey", linetype = "dashed"),
+        panel.grid.major.y = element_line(colour = "grey", linetype = "dashed"),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.direction = "horizontal",
+        legend.title = element_blank(),
+     legend.background = element_rect(fill="floralwhite",
+                                  size=0.5, linetype="solid", 
+                                  colour ="deepskyblue3"),
+     legend.position = c(0.8, 0.1),
+        axis.title = element_text(size = 11, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.text.x = element_text(size = 10, color = "black")) +
+  ylab("Number of migrants") +
+  xlab("Year")
+
+# Add anotation for p1:
+nim2012 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2012 & tas_migrants_con$Migration=='NIM'),3])
+nom2012 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2012 & tas_migrants_con$Migration!='NIM'),3])
+nim2017 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2017 & tas_migrants_con$Migration=='NIM'),3])
+nom2017 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2017 & tas_migrants_con$Migration!='NIM'),3])
+nim2013 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2013 & tas_migrants_con$Migration=='NIM'),3])
+nom2013 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2013 & tas_migrants_con$Migration!='NIM'),3])
+nim2008 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2008 & tas_migrants_con$Migration=='NIM'),3])
+nom2008 <- as.character(tas_migrants_con[which(tas_migrants_con$Year==2008 & tas_migrants_con$Migration!='NIM'),3])
+
+p1 <- p1 + annotate(geom = "text", x = 6, y = -1500, label = nim2012 , color ="darkblue") +
+   annotate(geom = "text", x = 6, y = 1200, label = nom2012 , color ="darkblue")  +
+  annotate(geom = "text", x = 11, y = 5100, label = nim2017 , color ="darkblue") +
+  annotate(geom = "text", x = 11, y = 1800, label = nom2017 , color ="darkblue") +
+   annotate(geom = "text", x = 7, y = -600, label = nim2013 , color ="darkblue") +
+  annotate(geom = "text", x = 7, y = 3500, label = nom2013 , color ="darkblue") +
+    annotate(geom = "text", x = 2, y = 4200, label = nim2008 , color ="darkblue") +
+  annotate(geom = "text", x = 2, y = 3400, label = nom2008 , color ="darkblue")
+
+# Create line chart for unemployment rate
+p2 <- ggplot(tas_unemploy_anual, aes(x = Year, y = AnnualUnemploymentRate)) +geom_point(stat = "identity")+
+  geom_line(aes(group = 0.5)) +
+  theme(panel.background = element_rect(fill = "white", color = "grey50"),
+        panel.grid.major.y = element_line(colour = "grey", linetype = "dashed"),
+        axis.title = element_text(size = 11, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.text.x = element_text(size = 10, color = "black")) +
+  ylab("Umemployment Rate (%)") +
+  xlab("Year")
+
+# Add Annotation
+unempl2013 <- as.character(tas_unemploy_anual[which(tas_unemploy_anual$Year ==2013), 2])
+unempl2008 <- as.character(tas_unemploy_anual[which(tas_unemploy_anual$Year ==2008), 2])
+unempl2017 <- as.character(tas_unemploy_anual[which(tas_unemploy_anual$Year ==2017), 2])
+unempl2012 <- as.character(tas_unemploy_anual[which(tas_unemploy_anual$Year ==2012), 2])
+p2 <- p2 + annotate(geom = "text", x = 7, y = 7.8, label = unempl2013, color ="darkblue") +
+   annotate(geom = "text", x = 2, y = 4.5, label = unempl2008, color = "darkblue") +
+  annotate(geom = "text", x = 6.1, y = 6.8, label = unempl2012, color = "darkblue") +
+   annotate(geom = "text", x = 11, y = 5.8, label = unempl2017, color = "darkblue")
+
+# Add two plot into one page
+p3 <- ggdraw() + draw_plot(p1, x= 0, y = 0.5, width = 1, height = 0.5) +
+  draw_plot(p2, x= 0, y= 0, width = 1, height = 0.5) +
+  draw_plot_label(label = c("NIM and NOM arrivals", "Average Annual Umployment Rate"), size = 10, colour = "#003366", 
+                  x = c(0.05, 0), y = c(1, 0.5))
+
+# Add sub text below the chart for explaination
+p3 <- add_sub(p3, "NIM: Net interstate migration ; NOM: Net oversea migration", x = 0.05, y=0.5, hjust = 0.1, fontface = "italic", size = 8, colour = "#004d99")
+
+# Create title for grid
+title <- ggdraw() +  draw_label("NIM and NOM arrivals vs Unemployment Rate in TASMANIA from 2007 to 2017", fontface='bold', vjust = 0, size = 12)
+
+# Plot grid of charts with title
+plot_grid(title, p3, ncol=1, rel_heights=c(0.1, 1))
+```
+
+
+
+
+
+
