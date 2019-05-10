@@ -1,0 +1,285 @@
+---
+title: "EVALUATING WINE QUALITY VIA PHYSICOCHEMICAL TESTS"
+author: "HUYNH AI LOAN (s3655461)"
+date: "11 June 2018"
+output:
+  html_notebook: 
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+    toc: no
+    toc_depth: 3
+  html_document:
+    toc: no
+    toc_depth: '3'
+linkcolor: blue
+references:
+- author:
+  - family: Xie
+    given: YiHui
+    issued:
+    - year: 2015
+    publisher: Chapman and Hall/CRC
+    title: Dynamic Documents with R and knitr
+  id: knitr
+- author:
+  - family: Breiman
+    given: L.
+  id: Breiman
+  issued:
+  - year: 2001
+  pages: 5-32
+  publisher: Machine Learning
+  title: Random Forests
+  volume: 45(1)
+- author:
+  - family: Bischl
+    given: Bernd
+  - family: Lang
+    given: Michel
+  - family: Kotthoff
+    given: Lars
+  - family: Schiffner
+    given: Julia
+  - family: Richter
+    given: Jakob
+  - family: Studerus
+    given: Erich
+  - family: Casalicchio
+    given: Giuseppe
+  - family: Jones
+    given: Zachary M.
+  id: mlr
+  issued:
+  - year: 2016
+  pages: 1-5
+  publisher: Journal of Machine Learning Research
+  title: '`mlr`: Machine Learning in R'
+  url: http://jmlr.org/papers/v17/15-066.html
+  volume: 17
+subtitle: MATH 2319 Machine Learning Applied Project Phase II
+documentclass: article
+---
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+# Introduction \label{sec1}
+
+The objective of this project is to build classifiers to predict whether physicochemical tests make thequality of wine larger than 5 grade in range of score between 0 (very bad) and 10 (very excellent) which are made by wine experts. The data sets were collected from the UCI Machine Learning
+Repository. In Phase I, we cleaned the data and re-categorised some descriptive features to be less granular. In Phase II, we built three binary-classifiers on the cleaned data. Section 2 describes an overview of our methodology. Section 3 discusses the classifiers and their tunning process. Section 4 compares the performance of the classifiers using the same resampling method. The last section concludes with a summary.
+
+# Methodology
+
+In this report, the three classifiers - Random Forest (RF), K-Nearest Neighbour (KNN) and Support Vector Machince (SVM) are considered to deal with the problem. The target feature in dataset was grouped into two levels which were less than or equal 5 (<=5) and larger than 5 (>5). The datet was splitted into training and test set with ratio 7:3. Each classifier was trainned to make probability predictions in order that we could adjust prediction threshold to evaluate the performance. For fine-tuning process, we used 5-folded cross validation stratified sampling on each classifier.
+
+Using the tuned hyperparmeters and the optimal thresholds defined from previous steps, we made prediction on the test data for each classifier. We used mean misclassification error rate (mmce) and confusion matrix on the test data to evaluate the classifiers's performance.
+
+# Hyperparameter Tune-Fining
+
+## K-Nearest Neighbour
+
+KNN uses distance to classify the features. Therefore, it is necessary to standardize the predictor variables. There are two type of distances used in this report including Manhattan and Euclidian distance. In addition, we also ran a grid search on k values in range from 0 to 10 in order to define which the best k neighbours give the best result for model. The tunning result is as below:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE, cache=TRUE}
+library(doParallel)
+registerDoParallel(cores = detectCores() - 1)
+library(tidyr)
+library(mlr)
+library(tidyverse)
+library(caret)
+library(kknn)
+
+# Load cleaned dataset
+cleaned_data <- read.csv2(file = "cleaned_data.csv", sep=";")
+cleaned_data<- cleaned_data %>% mutate(quality = ifelse(quality <= 5, as.character("<=5"), as.character(">=5")))
+cleaned_data$quality <- as.factor(cleaned_data$quality)
+
+# Set a common random seed for reproducibility
+set.seed(1234)
+```
+
+
+```{r}
+inTrain <- createDataPartition(cleaned_data$quality, p = 0.7, list = FALSE)
+training_data <- cleaned_data[inTrain,]
+test_data <- cleaned_data[-inTrain,]
+task <- makeClassifTask(data = training_data, target = 'quality', id = 'wine')
+knn_learner <- makeLearner('classif.kknn', predict.type = 'prob')
+ps_knn <- makeParamSet(
+  makeDiscreteParam('k', values = seq(2, 10, by = 1)),
+  makeDiscreteParam('distance', values=c(1,2)),
+  makeDiscreteParam('kernel', values = "cos")
+)
+ctrl  <- makeTuneControlGrid()
+rdesc <- makeResampleDesc("CV", iters = 5L, stratify = TRUE)
+# Configure tune wrapper with tune-tuning settings
+knn_tunedLearner <- makeTuneWrapper(learner = knn_learner, resampling = rdesc, measures = mmce, par.set= ps_knn, control = ctrl)
+# # Train the tune wrappers
+knn_tuneWrapper  <- mlr::train(knn_tunedLearner, task)
+
+# Get Tune Result
+print(getTuneResult(knn_tuneWrapper))
+```
+
+
+## Support Vector Machine
+
+We considered `gamma` and `cost` parameters for tuning. The `gamma` parameter defines how far the influence of a training data reaches. The higher value of gamma will try to fit training dataset. The `cost` of contrainst violation controls the trade off between smooth decision boundary and classifying the training points correctly. We experimented with `gamma` value from 0.5 to 3 and `cost` value in range of (0.5, 3).
+
+```{r error=FALSE}
+svm_learner <- makeLearner('classif.svm', predict.type = 'prob') 
+ps_svm <- makeParamSet(
+  makeDiscreteParam('gamma', values = c(0.5,1, 1.5, 2, 2.5, 3)),
+  makeDiscreteParam('cost', values = c(0.5,1, 1.5, 2, 2.5, 3))
+)
+svm_tunedLearner <- makeTuneWrapper(svm_learner, rdesc, measures=list(acc,mmce), ps_svm, ctrl) 
+svm_tuneWrapper  <- mlr::train(svm_tunedLearner, task) 
+# Get Tune Result
+print(getTuneResult(svm_tuneWrapper))
+
+```
+
+
+## Random Forest
+
+For RF, we did experiment with `mtry` of 1 through 10. The result is as below:
+
+```{r}
+rf_learner <- makeLearner('classif.randomForest', predict.type = 'prob')
+ps_rf <- makeParamSet(
+  makeDiscreteParam('mtry', values = seq(1,10, by = 1))
+)
+rf_tunedLearner <- makeTuneWrapper(rf_learner, rdesc, measures=list(acc,mmce), ps_rf, ctrl)
+rf_tuneWrapper  <- mlr::train(rf_tunedLearner, task) 
+# Get Tune Result
+print(getTuneResult(rf_tuneWrapper))
+
+```
+
+## Threshold Adjustment
+
+The following figures show the value of mmce vs the range of probability thresholds. The thresholds which may be used to determine the probability of wine with above average quality (quality >5) were approximately 0.45, 0.28 and 0.37 for 10-KNN, SVM and RF respectively.
+
+### KNN 
+
+```{r cache = TRUE}
+
+# Predict on training data
+knn_tunePredict <- predict(knn_tuneWrapper, task)
+
+# Get threshold values for KNN learner ----
+dt_knn_thresholds <- generateThreshVsPerfData(knn_tunePredict, measures = list(fpr, tpr, mmce))
+
+# Plot thresholds adjustment for each learner
+mlr::plotThreshVsPerf(dt_knn_thresholds) + labs(title = 'Threshold Adjustment for 10- KNN', x = 'Threshold')
+
+```
+
+```{r}
+# Get Threshold value of KNN
+knn_threshold<- dt_knn_thresholds$data$threshold[ which.min(dt_knn_thresholds$data$mmce) ]
+knn_threshold
+```
+
+### Suport Vector Machine
+
+```{r, echo = FALSE}
+svm_tunePredict <- predict(svm_tuneWrapper, task)
+dt_svm_thresholds <- generateThreshVsPerfData(svm_tunePredict, measures = list(fpr, tpr, mmce))
+mlr::plotThreshVsPerf(dt_svm_thresholds) + labs(title = 'Threshold Adjustment for Support Vector Machine', x = 'Threshold')
+
+```
+
+```{r}
+# Get Threshold value of SVM:
+svm_threshold<- dt_svm_thresholds$data$threshold[ which.min(dt_svm_thresholds$data$mmce) ]
+svm_threshold
+```
+
+### Random Forest
+
+```{r}
+rf_tunePredict <- predict(rf_tuneWrapper, task)
+dt_rf_thresholds <- generateThreshVsPerfData(rf_tunePredict, measures = list(fpr, tpr, mmce))
+mlr::plotThreshVsPerf(dt_rf_thresholds) + labs(title = 'Threshold Adjustment for Random Forest', x = 'Threshold')
+
+```
+
+```{r}
+# Get threshold for RF
+rf_threshold<- dt_rf_thresholds$data$threshold[ which.min(dt_rf_thresholds$data$mmce) ]
+rf_threshold
+```
+
+
+# Evaluation
+
+Making prediction on test data for each classifier
+
+```{r echo = FALSE, cache = TRUE, message= FALSE, warning=FALSE}
+
+# 3. Evaluation on test data ----
+# we shall use tuned wrapper models and optimal thresholds from previous sections
+print("===== Predict test data using KNN =========")
+knn_testPred <- predict(knn_tuneWrapper , newdata = test_data)
+setThreshold(knn_testPred, knn_threshold )
+print("===== Predict test data using SVM =========")
+svm_testPred <- predict(svm_tuneWrapper , newdata = test_data)
+setThreshold(svm_testPred, svm_threshold )
+print("===== Predict test data using RF =========")
+rf_testPred <- predict(rf_tuneWrapper , newdata = test_data)
+setThreshold(rf_testPred, rf_threshold )
+
+```
+
+Using the parameters and threshold levels, we calculated the ROC measures for each classifier. The  Confusion Matrix and ROC measures of KNN classifer is as follow:
+
+```{r, echo = FALSE}
+print("=========== Confusion Matrix================")
+calculateConfusionMatrix(knn_testPred, relative = TRUE)
+print ("========= ROC Measures ==========")
+calculateROCMeasures(knn_testPred)
+```
+
+The Confusion Matrix and ROC measures of SVM classifer is as follow:
+
+```{r, echo = FALSE}
+print("=========== Confusion Matrix================")
+calculateConfusionMatrix(svm_testPred, relative = TRUE)
+print ("========= ROC Measures ==========")
+calculateROCMeasures(svm_testPred)
+
+```
+
+The  Confusion Matrix and  ROC measures of RF classifer is as follow:
+
+```{r, echo = FALSE}
+
+print("=========== Confusion Matrix - RF ================")
+calculateConfusionMatrix(rf_testPred,relative = TRUE)
+print ("========= ROC Measures ==========")
+calculateROCMeasures(rf_testPred)
+```
+
+It is obviously to see that RandomForest classier gave higher accuracy rate rather than KNN and SVM.
+
+# Discussion
+
+Three models gave the accuracy more than 79%. But RandomForest produced the better performance. All three classifiers did perform high accuracy in predicting the quality of wine larger than 5. However, three models cannot deal with imbalance issues in this dataset.
+
+In addition, the time execution for SVM is longer than KNN and RF. It might imply that SVM may be not suitable for large dataset.
+
+# Conclusion
+
+Among three classifiers, the Random Forest produces the best performance in predicting whether physicochemical tests give the quality of wine larger than 5 grade of score between 0 (very bad) and 10 (very excellent) which were evaluated by wine experts. We split the dataset into training and test sets with ratio 7:3. Based on that, we determined the optimal value of the selected hyperparameters of each classifier and the probability threshold. In the future work, we will consider another solution to deal with imbalance issues from this dataset.
+
+# References
+
+

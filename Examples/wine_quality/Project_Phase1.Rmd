@@ -1,0 +1,249 @@
+---
+title: "ProjectPhase1"
+author: "LoanHuynh - s3655461"
+date: "8 April 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Data
+
+
+```{r}
+library(dplyr)
+library(plotly)
+
+```
+
+## Data Preprocessing
+```{r}
+# Load dataset
+wine_white <- read.csv2(file = "Dataset/winequality-white.csv", header = TRUE, sep = ";")
+str(wine_white)
+
+```
+
+```{r}
+# Data Summary
+summary(wine_white)
+```
+
+```{r}
+# Transform Data: Convert datatype from Factor into Numeric:
+indx <- sapply(wine_white, is.factor) # get Index of factor columns
+wine_white[indx] <- lapply(wine_white[indx], function(x) as.numeric(as.character(x)))
+str(wine_white)
+```
+
+```{r}
+# Data Summary
+summary(wine_white)
+```
+
+```{r}
+#===== Check Outlier for each variables
+#===== Fixed.Acidity
+plot_ly(type = 'box') %>% add_boxplot(y= wine_while$fixed.acidity, name=" Fixed Acidity") # Boxplot
+
+```
+
+```{r}
+# Display histogram of fixed acidity
+plot_ly(x = wine_white$fixed.acidity, type="histogram") %>% layout(title = "Histogram of Fixed Acidity", xaxis =list(title= 'Fixed Acidity'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove outlier in Fixed Acidity
+wine_white <- wine_white %>% mutate(fixed.acidity = (ifelse(fixed.acidity>=10, NA, as.numeric(fixed.acidity))))
+wine_white <- wine_white %>% mutate(fixed.acidity = (ifelse(fixed.acidity<=4, NA, as.numeric(fixed.acidity))))
+```
+
+```{r}
+#======== Check Outlier of Volatile Acidity
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$volatile.acidity, name = "Volatile acidity") 
+```
+
+```{r}
+# histogram
+plot_ly(x = wine_white$volatile.acidity, type="histogram") %>% layout(title = "Histogram of Volatile Acidity", xaxis =list(title= 'Volatile Acidity'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+wine_white <- wine_white %>% mutate(volatile.acidity = (ifelse(volatile.acidity>=0.6, NA, as.numeric(volatile.acidity))))
+```
+
+```{r}
+# ====== Check Outlier of Citric acid
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$citric.acid, name = "Citric acidity") 
+```
+
+```{r}
+plot_ly(x = wine_white$citric.acid, type="histogram") %>% layout(title = "Histogram of Citric Acid", xaxis =list(title= 'Citric Acid'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove Outlier
+wine_white <- wine_white %>% mutate(citric.acid = (ifelse(citric.acid==0, NA, as.numeric(citric.acid))))
+wine_white <- wine_white %>% mutate(citric.acid = (ifelse(citric.acid>0.75, NA, as.numeric(citric.acid))))
+```
+
+```{r}
+# ------------- Check outlier of Residual sugar
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$residual.sugar, name = "Residual Sugar") 
+```
+
+```{r}
+plot_ly(x = wine_white$residual.sugar, type="histogram") %>% layout(title = "Histogram of Residual Sugar", xaxis =list(title= 'Residual Sugar'), yaxis= list(title= 'Frequency'))
+```
+```{r}
+# Remove outlier
+wine_white <- wine_white %>% mutate(residual.sugar = (ifelse(residual.sugar>22, NA, as.numeric(residual.sugar))))
+```
+
+```{r}
+# ---------- CHeck Outlier of chlorides
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$chlorides, name = "Chlorides") 
+
+```
+
+```{r}
+plot_ly(x = wine_white$chlorides, type="histogram") %>% layout(title = "Histogram of Chlorides", xaxis =list(title= 'Chlorides'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove outlier
+wine_white <- wine_white %>% mutate(chlorides = (ifelse(chlorides>0.1, NA, as.numeric(chlorides))))
+```
+```{r}
+#---------------- Check outlier of free.sulfur.dioxide
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$free.sulfur.dioxide, name = "Free Sulfur Dioxide") 
+```
+
+```{r}
+plot_ly(x = wine_white$free.sulfur.dioxide, type="histogram") %>% layout(title = "Histogram of Free Sulfur Dioxide", xaxis =list(title= 'Free Sulfur Dioxide'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove outlier
+wine_white<- wine_white %>% mutate(free.sulfur.dioxide = (ifelse(free.sulfur.dioxide>=75, NA, as.numeric(free.sulfur.dioxide))))
+```
+
+```{r}
+#----------- Check Outliers of total.sulfur.dioxide
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$total.sulfur.dioxide, name = "Total Sulfur Dioxide") 
+```
+
+```{r}
+plot_ly(x = wine_white$total.sulfur.dioxide, type="histogram") %>% layout(title = "Histogram of Total Sulfur Dioxide", xaxis =list(title= 'Total Sulfur Dioxide'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove outlier
+wine_white <- wine_white %>% mutate(total.sulfur.dioxide = (ifelse(total.sulfur.dioxide>=270, NA, as.numeric(total.sulfur.dioxide))))
+wine_white <- wine_white %>% mutate(total.sulfur.dioxide = (ifelse(total.sulfur.dioxide<=25, NA, as.numeric(total.sulfur.dioxide))))
+```
+
+```{r}
+#----------- Check Outliers of Density
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$density, name = "Density") 
+```
+
+```{r}
+plot_ly(x = wine_white$density, type="histogram") %>% layout(title = "Histogram of Density", xaxis =list(title= 'Total Density'), yaxis= list(title= 'Frequency'))
+```
+```{r}
+# Remove outlier
+wine_white <- wine_white %>% mutate(density = (ifelse(density >= 1.001, NA, as.numeric(density))))
+```
+
+```{r}
+#------------ Check Outliers of sulphates
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$sulphates, name = "Sulphates") 
+
+```
+
+```{r}
+plot_ly(x = wine_white$sulphates, type="histogram") %>% layout(title = "Histogram of Sulphates", xaxis =list(title= 'Sulphates'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Remove outliers
+wine_white <- wine_white %>% mutate(sulphates = (ifelse(sulphates >= 0.8, NA, as.numeric(sulphates))))
+```
+
+```{r}
+#---------------- Check Outliers of Alcohol
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$alcohol, name = "Alcohol") 
+```
+
+```{r}
+#-------------------- Check Outliers of pH
+plot_ly(type = 'box') %>% add_boxplot(y= wine_white$pH, name = "pH") 
+```
+
+```{r}
+plot_ly(x = wine_white$pH, type="histogram") %>% layout(title = "Histogram of pH", xaxis =list(title= 'pH'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Clean NA values
+wine_white <- na.omit(wine_white)
+# Summary data table
+```
+
+```{r}
+table(wine_white$quality) %>% kable(caption = "Number of Quality Classes after Data Preprocessing")
+```
+
+## Data EXPLORE
+```{r}
+# Get subdata with Quality <=5 and Quality >5
+wine_white2_larger5 <- wine_white %>% filter(quality>5)
+wine_white2_less5 <- wine_white %>% filter(quality <=5)
+# Fixed Acidity
+plot_ly(x= wine_white2_larger5$fixed.acidity, type = "histogram", name = 'Quality>5') %>% 
+  add_histogram(x = wine_white2_less5$fixed.acidity, name='Quality<=5') %>% layout(title = "Histogram of Fixed Acidity by Quality Classes", xaxis = list(title="Fixed Acidity") )
+```
+
+
+```{r}
+plot_ly(x = wine_white$fixed.acidity, type="histogram") %>% layout(title = "Histogram of Fixed Acidity", xaxis =list(title= 'Fixed Acidity'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Volatile Acidity
+plot_ly(x= wine_white2_larger5$volatile.acidity, type = "histogram", name = 'Quality>5') %>% 
+  add_histogram(x = wine_white2_less5$volatile.acidity, name='Quality<=5') %>% layout(title = "Histogram of Volatile Acidity by Quality Classes", xaxis = list(title="Volatile Acidity") )
+```
+```{r}
+plot_ly(x = wine_white$volatile.acidity, type="histogram") %>% layout(title = "Histogram of Volatile Acidity", xaxis =list(title= 'Volatile Acidity'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+# Residual Sugar
+plot_ly(x = wine_white$residual.sugar, type="histogram") %>% layout(title = "Histogram of Residual Sugar", xaxis =list(title= 'Residual Sugar'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+plot_ly(x= wine_white2_larger5$residual.sugar, type = "histogram", name = 'Quality>5') %>% 
+  add_histogram(x = wine_white2_less5$residual.sugar, name='Quality<=5') %>% layout(title = "Histogram of Residual Sugar by Quality Classes", xaxis = list(title="Residual Sugar") )
+```
+
+```{r}
+# Alcohol
+plot_ly(x = wine_white$alcohol, type="histogram") %>% layout(title = "Histogram of Alcohol", xaxis =list(title= 'Alcohol'), yaxis= list(title= 'Frequency'))
+```
+
+```{r}
+plot_ly(x= wine_white2_larger5$alcohol, type = "histogram", name = 'Quality>5') %>% 
+  add_histogram(x = wine_white2_less5$alcohol, name='Quality<=5') %>% layout(title = "Histogram of Alcohol by Quality Classes", xaxis = list(title="Alcohol") )
+
+```
+
+
+
+
+
