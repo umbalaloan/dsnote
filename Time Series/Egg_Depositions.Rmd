@@ -1,0 +1,338 @@
+---
+title: "Time Series Analysis - Assigment 2"
+author: "Loan Huynh - s3655461"
+output:
+  word_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+## Introduction
+
+This report tries to find the suitable model which used to predict Egg deposition in next 5 years. The dataset is Egg depositions of age-3 Lake Huron Bloasters between 1981 and 1996 in **BloaterLH** dataset of **FSAdata** package
+
+```{r warning=FALSE, message=FALSE}
+# Loadpackage
+library(FSAdata)
+library(TSA)
+library(fUnitRoots) # package used to test Non-stationary series
+library(tseries)
+library(lmtest)
+library(forecast) # package used for forecasting
+```
+## Data Description
+
+```{r}
+# Load dataset
+data(BloaterLH)
+
+# Only get Eggs column data in BloaterLH 
+egg <- BloaterLH$eggs
+
+# Create Time Series objects for Egg data
+egg_ts <- ts(egg, start = 1981, end = 1996)
+
+# Plot Egg Deposition Series data
+plot(egg_ts, type = 'o', xlab= 'Year',ylab="Egg Deposition", panel.first=grid(), main = "Time Series of Egg Deposition")
+```
+
+This series has an upward trend and changes of variation, but no repeating pattern in seasonality. There are some suceeding points but no fluctuation. It looks like the autoregressive </br>
+
+Using Scatter Plot to see the relationship between Egg Deposition of previous years
+
+```{r}
+# Scatter Plot
+plot(y= egg_ts , x = zlag(egg_ts ), ylab = 'Egg Deposition Series', xlab =  'Previous Year',
+     panel.first=grid(), main = "Scatter Plot of Egg Deposition in Previous Years")
+abline(coef = c(0,1), col= "red")
+```
+It is obviously to see that there is a strong correlation between Egg Depositions of previous Years in Scatter Plot. The following code is to calculate the value of correlation
+
+```{r}
+y <- egg_ts # Load data into y
+
+x <- zlag(egg_ts) # Generate first lag of the abundance series
+
+index <- 2:length(x)# Create index to get rid of the first NA value in x
+
+cor(y[index], x[index])# Calculate the correlation between numerical values in x and y
+```
+
+The correlation is 0.7445657. This is a strong positive correlation </br>
+
+Apply ADF Test to check whether series in stationary or non-stationary
+
+```{r}
+ar(diff(egg_ts))
+```
+Order of this test is 0
+
+```{r}
+adfTest(egg_ts, lags = 0)
+```
+
+The p_value is 0.452  larger than 5% level of significant. Therefore we cannot reject null hypothesis about non-stationary. It implies that this series is non-stationary. It is clearly shown in ACF and PACF plots as below:
+
+```{r warning=FALSE, message=FALSE}
+par(mfrow=c(1,2))
+acf(egg_ts)
+pacf(egg_ts)
+```
+
+
+The ACF plot has pattern which has a large spike at lag 1 that decrease after a few lags </br>
+
+## DATA MODELING
+#### DATA TRANSFORMATION AND DIFFERENCE
+
+Apply Log transformation for this series
+
+```{r}
+# Using Log transform
+log.egg <- log(egg_ts)
+plot(log.egg , type = 'o', xlab="Year", ylab= "Egg Deposition", main =" Time Series of Transformed Egg Deposition", panel.first=grid())
+```
+This series still has a trend. </br>
+
+Applying the first difference for transformed data
+
+```{r}
+diff.log.egg = diff(log.egg)
+plot(diff.log.egg ,type='o',ylab='Egg Deposition', xlab= "Year", main = "Time Series - 1st Difference of Egg Deposition",
+     panel.first=grid())
+```
+
+Applying ADF unit-root test to test the existence of non-stationary with this series
+
+```{r}
+ar(diff(diff.log.egg))
+
+```
+
+Order for this test is 4
+
+```{r}
+adfTest(diff.log.egg, lags = 4)
+```
+  
+The p-value is 0.2049 larger than 5% level of significance. Therefore, this series is still non-stationary. Hence, we apply the second difference 
+
+```{r}
+diff2.log.egg <- diff(diff.log.egg, diference = 2)
+plot(diff2.log.egg ,type='o',ylab='Egg Deposition', xlab= "Year", main = "Time Series - 2nd Difference of Egg Deposition",
+     panel.first=grid())
+```
+
+Applying ADF unit-root test for second difference
+
+```{r}
+ar(diff(diff2.log.egg))
+```
+
+Order for this test is 1
+
+```{r}
+adfTest(diff2.log.egg, lags = 1)
+```
+p-value = 0.01 
+
+The p-value equals 0.01 less than 5% level of signigicance. Therefore, we can reject null hypothesis for non-stationary. It means that this series is stationary. </br>
+
+Displaying ACF and PACF plots
+
+```{r}
+par(mfrow=c(1,2))
+acf(diff2.log.egg)
+pacf(diff2.log.egg)
+```
+There is no pattern in ACF and PACF plots. </br>
+
+__Using EACF__
+```{r}
+# Applying EACF
+eacf(diff2.log.egg, ar.max = 3, ma.max = 3)
+```
+From the above matrix, the possible models are ARIMA(0,2,1), ARIMA(1,2,0), ARIMA(1,2,1) </br>
+
+__Using BIC table__
+
+```{r message=FALSE, warning=FALSE}
+# Using BIC table
+res = armasubsets(y=diff2.log.egg,nar=3,nma=3,y.name='test',ar.method='ols')
+plot(res)
+```
+
+From BIC table, possible models include ARIMA(2,2,1) , ARIMA(2,2,3) and ARIMA(1,2,1)
+
+Hence the set of possible models will be {ARIMA(2,2,1), ARIMA(1,2,1), ARIMA(2,2,3), ARIMA(0,2,1), ARIMA(1,2,0), ARIMA(1,2,1)}
+
+##### PARAMETER ESTIMATION
+In order to estimate parameters of possible models, I use Maximum Likelihood method </br>
+
+__ARIMA(0,2,1)__
+
+```{r}
+# Maximum likelihood estimates of the coefficients for ARIMA(0,2,1)
+model.021 <- arima(egg_ts,order=c(0,2,1),method='ML')
+model.021
+```
+```{r}
+# Maximum likelihood estimates of the coefficients with significance tests for ARIMA(0,2,1) model
+coeftest(model.021)
+```
+The p-value is less than 0.05. Therefore the estimated coefficients of ARIMA(0,2,1) model is significant </br>
+
+__ARIMA(2,2,1)__
+
+```{r}
+# Maximum likelihood estimates of the coefficients for ARIMA(2,2,1)
+model.221 <- arima(egg_ts, order = c(2,2,1), method = 'ML')
+model.221
+```
+
+```{r}
+# Maximum likelihood estimates of the coefficients with significance tests for ARIMA(2,2,1) model
+coeftest(model.221)
+```
+
+The estimated ar1 and ar2 coefficients are larger than 0.05. This means that they are are not significant
+
+__ARIMA(1,2,1)__
+
+```{r}
+# Maximum likelihood estimates of the coefficients for ARIMA(1,2,1)
+model.121 <- arima(egg_ts, order = c(1,2,1), method = 'ML')
+model.121
+```
+```{r}
+# Maximum likelihood estimates of the coefficients with significance tests for ARIMA(1,2,1) model
+coeftest(model.121)
+```
+
+AR1 is insignificant in model ARIMA(1,2,1)
+
+__ARIMA(2,2,3)__
+
+```{r}
+model.223 <- arima(egg_ts, order = c(2,2,3), method = 'ML')
+coeftest(model.223)
+```
+AR1, AR2, MA1 and MA2 are insignificant
+
+__ARIMA(1,2,0)__
+
+```{r}
+model.120 <- arima(egg_ts, order = c(1,2,0), method = 'ML')
+coeftest(model.120)
+```
+
+AR1 is not significant as well in model ARIMA(1,2,0)
+
+
+##### APPLYING AIC and BIC to decide the best model within the subset of possible models </br>
+
+__ AIC__
+
+```{r}
+AIC(model.021)
+```
+
+```{r}
+AIC(model.120)
+```
+
+```{r}
+AIC(model.121)
+```
+
+```{r}
+AIC(model.221)
+```
+
+```{r}
+AIC(model.223)
+```
+__BIC__
+
+```{r}
+AIC(model.021, k = log(28))
+```
+
+```{r}
+AIC(model.121, k = log(28))
+```
+
+```{r}
+AIC(model.221, k = log(28))
+```
+```{r}
+AIC(model.223, k = log(28))
+```
+
+The smallest AIC is model ARIMA(0,2,1) with  22.74602. According to BIC, model ARIMA(0,2,1) with value 25.41043 is the best. Therefore ARIMA(0,2,1) is the best model.
+
+## MODEL DIAGNOTICS
+
+__Normality Testing__
+
+```{r}
+
+plot(rstandard(model.021), type= 'o', ylab="Standardized Residuals", main = "Time Series Plot of standardised residuals for Egg Deposition Series")
+abline(h=0)
+```
+
+```{r}
+# Using QQplot
+qqnorm(residuals(model.021))
+qqline(residuals(model.021), col = 2)
+```
+
+Most of values lie on the red line. However, there are still some outliers at the top right and left bottom
+
+```{r}
+# Using Shapiro test
+shapiro.test(diff2.log.egg)
+```
+The p-value is 0.531 > 0.05. Therefore, we cannot reject H0 hypothesis which is normality error assumption. This implies that normality error assumption is not violated </br>
+
+__AutoCorrelation of residuals testing__
+
+```{r}
+acf(residuals(model.021))
+```
+
+```{r}
+pacf(residuals(model.021))
+```
+
+From ACF and PACF plots of residuals, we can conclude that the residuals constitutes a white noise series as there is no highly significant correlation.
+
+__LJUNG - BOX TEST__
+
+```{r}
+Box.test(residuals(model.021), lag = length(model.021$residuals) -1, type = "Box-Pierce", fitdf = 0)
+```
+The p-value in LjungBox test is 0.9892 > 0.05. Therefore, we cannot reject null hypothesis that the error terms are uncorrelated. </br>
+
+In conclusion, there is no problem in the residuals of ARIMA(0,2,1) model.
+
+## FORECASTING
+```{r}
+# Create a matrix of the covariance for prediction
+xreg=data.frame (constant=seq(egg_ts))
+n = length(egg_ts)
+n.ahead = 5
+newxreq = data.frame(constant = (n+1): (n+n.ahead))
+# Predict Egg Deposition for next 5 years
+predict(model.021, n.ahead = 5, newxreg = NULL, se.fit = TRUE)
+```
+The predict values of Egg depositions in next five years are {1.089693 ; 1.155287; 1.220880; 1.286473 ; 1.352067}
+```{r}
+#Plot forecasts over time series
+fit = Arima(egg_ts,c(0,2,1))
+plot(forecast(fit,h=10))
+```
+
+
